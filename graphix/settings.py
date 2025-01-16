@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "users",
+    "pdfgenerator",
     "rest_framework",
     "corsheaders",
     "drf_spectacular"
@@ -156,6 +157,8 @@ MEDIA_URL = "/media/"
 
 TEMP_PDF_ROOT = os.path.join(MEDIA_ROOT, "temp_pdfs/")
 os.makedirs(TEMP_PDF_ROOT, exist_ok=True)
+PREVIEW_IMAGES_ROOT = os.path.join(MEDIA_ROOT, "preview_images/")
+os.makedirs(PREVIEW_IMAGES_ROOT, exist_ok=True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

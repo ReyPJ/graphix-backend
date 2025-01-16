@@ -11,5 +11,7 @@ urlpatterns = [
     path("api/users/", include("users.urls")),
     # Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/schema/swagger/", SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-schema')
+    path("api/schema/swagger/", SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-schema'),
+    # PDF generator
+    path("api/pdf/", include("pdfgenerator.urls"))
 ]

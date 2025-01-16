@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.timezone import now
+from users.models import CustomUser
 import os
 
 
@@ -8,7 +9,7 @@ def pdf_upload_path(instance, filename):
 
 
 class GeneratedPDFModel(models.Model):
-    user = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     pdf_file = models.FileField(upload_to=pdf_upload_path)
     created_at = models.DateTimeField(auto_now_add=True)
 
