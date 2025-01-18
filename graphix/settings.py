@@ -1,5 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import timedelta
 import os
 
 load_dotenv()
@@ -32,6 +33,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "users",
     "pdfgenerator",
+    "stages",
     "rest_framework",
     "corsheaders",
     "drf_spectacular"
@@ -98,7 +100,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "Grahpix API",
     "DESCRIPTION": "API For Grahpix Client PDF generate system",
-    "VERISON": "0.1",
+    "VERSION": "0.0.2",
     "SERVE_INCLUDE_SCHEMA": False
 }
 
@@ -164,3 +166,9 @@ os.makedirs(PREVIEW_IMAGES_ROOT, exist_ok=True)
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# JWT SETTINGS
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=3)
+}

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import TemporaryUserCreateView, PdfProgressUpdateView
+from .views import TemporaryUserCreateView, GetUserInfoView
 
 urlpatterns = [
     path(
@@ -7,9 +7,5 @@ urlpatterns = [
         TemporaryUserCreateView.as_view(),
         name="create a temporary user",
     ),
-    path(
-        "update-progress/<int:pk>/",
-        PdfProgressUpdateView.as_view(),
-        name="update progress",
-    ),
+    path("get-user/<int:pk>/", GetUserInfoView.as_view(), name="user info")
 ]

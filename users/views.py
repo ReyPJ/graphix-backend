@@ -26,19 +26,7 @@ class TemporaryUserCreateView(generics.CreateAPIView):
         )
 
 
-class PdfProgressUpdateView(generics.UpdateAPIView):
-    queryset = CustomUser.objects.filter(is_temporary=True)
+class GetUserInfoView(generics.RetrieveAPIView):
+    queryset = CustomUser.objects.all()
     serializer_class = TemporaryUserSerializer
     permission_classes = [IsAuthenticated]
-
-    def update(self, request, *args, **kwargs):
-        user = self.get_object()
-        pdf_progress = request.data.get("pdf_progress", user.pdf_progress)
-
-        if pdf_progress < 0 or pdf_progress > 5:
-            return Response({"error": "El progreso debe ser entre 0 y 5"})
-
-        user.pdf_progress = pdf_progress
-
-        user.save()
-        return Response({"id": user.id, "pdf_progress": user.pdf_progress})

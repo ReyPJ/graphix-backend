@@ -10,7 +10,7 @@ class CustomUser(AbstractUser):
         null=True,
         blank=True,
     )
-    pdf_progress = models.IntegerField(default=0)
+    pdf_progress = models.IntegerField(default=1)
     page_limit = models.IntegerField(default=50)
 
     raw_password = models.CharField(max_length=250, editable=False)
