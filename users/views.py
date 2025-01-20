@@ -22,11 +22,47 @@ class TemporaryUserCreateView(generics.CreateAPIView):
                 "package": response_data["package"],
                 "page_limit": response_data["page_limit"],
                 "pdf_progress": response_data["pdf_progress"],
-            }
+            },
+            status=201,
         )
 
 
-class GetUserInfoView(generics.RetrieveAPIView):
+class GetUserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.filter(is_temporary=True)
+    serializer_class = TemporaryUserSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class GetUsernameView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = TemporaryUserSerializer
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+
+        return Response({"username": user.username}, status=200)
+
+
+class DeleteUserView(generics.DestroyAPIView):
+    queryset = CustomUser.objects.filter(is_temporary=True)
+    serializer_class = TemporaryUserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def destroy(self, request, *args, **kwargs):
+        userIds = request.data.get("userIds", [])
+
+        if not userIds:
+            return Response({"detail": "No user IDs provided"}, status=400)
+
+        users_to_delete = CustomUser.objects.filter(id__in=userIds, is_temporary=True)
+        if users_to_delete.exists():
+            count, _ = users_to_delete.delete()
+            return Response(
+                {"message": f"{count} usuarios eliminados correctamente"}, status=204
+            )
+
+        return Response(
+            {"detail": "No users found with the provided IDs."},
+            status=404,
+        )
