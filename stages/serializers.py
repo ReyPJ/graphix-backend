@@ -12,3 +12,7 @@ class StageSerializer(serializers.ModelSerializer):
         if value < 1 or value > 6:
             raise serializers.ValidationError("Stage number must be between 1 and 6")
         return value
+
+
+class FileSerializer(serializers.Serializer):
+    file = serializers.FileField()

@@ -1,7 +1,12 @@
 from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .serializers import StageSerializer
+from rest_framework.parsers import MultiPartParser
+from django.core.files.storage import default_storage
+from django.conf import settings
+import os
+from .serializers import StageSerializer, FileSerializer
 from .models import StageDataModel
 
 
@@ -50,3 +55,26 @@ class StageDataView(APIView):
             },
             status=201,
         )
+
+
+class FileUploadView(GenericAPIView):
+    parser_classes = [MultiPartParser]
+    permission_classes = [IsAuthenticated]
+    serializer_class = FileSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        file = serializer.validated_data["file"]
+
+        directory_path = settings.COVER_IMAGES_ROOT
+
+        file_path = os.path.join(directory_path, file.name)
+        with default_storage.open(file_path, "wb+") as destination:
+            for chunk in file.chunks():
+                destination.write(chunk)
+
+        # Construir la URL del archivo
+        file_url = os.path.join(settings.MEDIA_URL, "cover_images/", file.name)
+        return Response({"file_url": request.build_absolute_uri(file_url)}, status=201)
