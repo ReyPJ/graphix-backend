@@ -12,7 +12,15 @@ class CustomUser(AbstractUser):
     is_temporary = models.BooleanField(default=False)
     package = models.CharField(
         max_length=20,
-        choices=[("basic", "Basico"), ("medium", "Medio"), ("premium", "Premium")],
+        choices=[
+            ("basic", "Basico"),
+            ("medium", "Medio"),
+            ("premium", "Premium"),
+            ("gold", "Oro"),
+            ("platinum", "Platino"),
+            ("diamond", "Diamante"),
+            ("custom", "Personalizado"),
+        ],
         null=True,
         blank=True,
     )
@@ -21,14 +29,29 @@ class CustomUser(AbstractUser):
 
     raw_password = models.CharField(max_length=250, editable=False)
 
+    PACKAGE_PAGE_LIMITS = {
+        "basic": 54,
+        "medium": 64,
+        "premium": 80,
+        "gold": 90,
+        "platinum": 100,
+        "diamond": 150,
+    }
+
     def set_page_limit(self):
-        if self.package == "basic":
-            self.page_limit = 50
+        if self.package == "custom":
+            return
 
-        elif self.package == "medium":
-            self.page_limit = 150
-
-        elif self.package == "premium":
-            self.page_limit = 250
-
+        self.page_limit = self.PACKAGE_PAGE_LIMITS.get(self.package, 50)
         self.save()
+
+    def clean(self):
+        super().clean()
+
+        if (
+            self.package != "custom"
+            and self.page_limit != self.PACKAGE_PAGE_LIMITS.get(self.package, 50)
+        ):
+            raise ValidationError(
+                f"Limit of pages for package '{self.package}' needs to be {self.PACKAGE_PAGE_LIMITS.get(self.package, 50)}"
+            )
