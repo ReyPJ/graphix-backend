@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import TemporaryUserCreateView, GetUserListView, DeleteUserView, GetUsernameView
+from .views import TemporaryUserCreateView, GetUserListView, DeleteUserView, GetUserInfoView
 
 urlpatterns = [
     path(
@@ -9,5 +9,5 @@ urlpatterns = [
     ),
     path("get-users/", GetUserListView.as_view(), name="users-list"),
     path("delete-user/", DeleteUserView.as_view(), name="delete-user"),
-    path("get-username/", GetUsernameView.as_view(), name="get-username")
+    path("get-user-info/", GetUserInfoView.as_view(), name="get-user-info")
 ]

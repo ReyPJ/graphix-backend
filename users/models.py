@@ -1,5 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+
+
+def validate_non_negative(value):
+    if value < 0:
+        raise ValidationError("The value can't be negative'")
 
 
 class CustomUser(AbstractUser):
@@ -11,7 +17,7 @@ class CustomUser(AbstractUser):
         blank=True,
     )
     pdf_progress = models.IntegerField(default=1)
-    page_limit = models.IntegerField(default=50)
+    page_limit = models.IntegerField(default=50, validators=[validate_non_negative])
 
     raw_password = models.CharField(max_length=250, editable=False)
 

@@ -21,17 +21,12 @@ class GeneratePDFSerializer(serializers.Serializer):
         help_text="Optional global CSS for styling all stages.",
     )  # CSS opcional
 
-    cover_image = serializers.URLField(
-        required=False,
-        help_text="URL of the cover image for stage 1. This will be used if provided.",
-    )
-
     stages = serializers.ListField(
         child=StageSerializer(),
         required=True,
         min_length=6,
         max_length=6,
-        help_text="List of 6 stages. Each stage must have its own HTML and page count.",
+        help_text="List of 15 or less stages. Each stage must have its own HTML and page count.",
     )  # Etapas individuales
     confirm = serializers.BooleanField(
         required=False,

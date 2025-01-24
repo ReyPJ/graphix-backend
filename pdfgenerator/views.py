@@ -45,7 +45,8 @@ class GeneratePreviewsView(APIView):
 
                 # Guardar la imagen generada en formato PNG (solo la primera página)
                 preview_image_path = os.path.join(
-                    settings.PREVIEW_IMAGES_ROOT, f"{user.username}_stage_{stage_index + 1}_preview.png"
+                    settings.PREVIEW_IMAGES_ROOT,
+                    f"{user.username}_stage_{stage_index + 1}_preview.png",
                 )
                 images[0].save(preview_image_path, "PNG")
                 preview_image_paths.append(preview_image_path)
@@ -79,7 +80,6 @@ class ConfirmAndGeneratePDFView(APIView):
         serializer.is_valid(raise_exception=True)
 
         stages = serializer.validated_data["stages"]
-        cover_image = serializer.validated_data.get("cover_image")
         confirm = request.data.get("confirm", False)
 
         if not confirm:
@@ -92,14 +92,6 @@ class ConfirmAndGeneratePDFView(APIView):
 
         try:
             combined_html_content = ""
-
-            if cover_image:
-                combined_html_content += f"""
-                <div style="text-align: center; margin: 50px 0;">
-                    <img src="{cover_image}" style="width: 100%; height: auto;" alt="Cover Image" />
-                </div>
-                <div style="page-break-before: always;"></div>
-                """
 
             for stage in stages:
                 # Dividir la etapa en tantas partes como lo indique page_count

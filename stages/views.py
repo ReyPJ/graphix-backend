@@ -8,6 +8,7 @@ from django.conf import settings
 import os
 from .serializers import StageSerializer, FileSerializer
 from .models import StageDataModel
+from django.core.exceptions import ValidationError
 
 
 class StageDataView(APIView):
@@ -23,7 +24,7 @@ class StageDataView(APIView):
             {
                 "pdf_progress": user.pdf_progress,
                 "stages": seralized_stages.data,
-                "userId": user.username,
+                "userName": user.username,
             },
             status=200,
         )
@@ -44,7 +45,12 @@ class StageDataView(APIView):
             },
         )
 
-        user.pdf_progress = stage_number + 1 if stage_number < 6 else 1
+        user.pdf_progress = stage_number + 1 if stage_number < 15 else 1
+        if stage.page_count:
+            if user.page_limit - stage.page_count < 0:
+                raise ValidationError("Not enought pages avalible")
+            user.page_limit -= stage.page_count
+
         user.save()
 
         return Response(
@@ -63,18 +69,24 @@ class FileUploadView(GenericAPIView):
     serializer_class = FileSerializer
 
     def post(self, request, *args, **kwargs):
+        print(request.data)
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
 
-        file = serializer.validated_data["file"]
+        directory_path = settings.RESOURCES_MEDIA_ROOT
 
-        directory_path = settings.COVER_IMAGES_ROOT
+        if serializer.is_valid():
+            files_urls = []
+            for file in serializer.validated_data["files"]:
+                file_path = os.path.join(directory_path, file.name)
+                with default_storage.open(file_path, "wb+") as destination:
+                    for chunk in file.chunks():
+                        destination.write(chunk)
+                files_urls.append(
+                    request.build_absolute_uri(
+                        os.path.join(settings.MEDIA_URL, "resources_image/", file.name)
+                    )
+                )
 
-        file_path = os.path.join(directory_path, file.name)
-        with default_storage.open(file_path, "wb+") as destination:
-            for chunk in file.chunks():
-                destination.write(chunk)
+            return Response({"files_url": files_urls}, status=201)
 
-        # Construir la URL del archivo
-        file_url = os.path.join(settings.MEDIA_URL, "cover_images/", file.name)
-        return Response({"file_url": request.build_absolute_uri(file_url)}, status=201)
+        return Response(serializer.errors, status=400)

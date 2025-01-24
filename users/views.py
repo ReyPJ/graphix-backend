@@ -33,15 +33,16 @@ class GetUserListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class GetUsernameView(generics.RetrieveAPIView):
+class GetUserInfoView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = TemporaryUserSerializer
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
+        serializer = self.get_serializer(user)
 
-        return Response({"username": user.username}, status=200)
+        return Response(serializer.data, status=200)
 
 
 class DeleteUserView(generics.DestroyAPIView):
