@@ -6,6 +6,7 @@ from .models import GeneratedPDFModel
 from weasyprint import HTML
 from django.conf import settings
 import os
+import hashlib
 from pdf2image import convert_from_path
 
 
@@ -15,56 +16,97 @@ class GeneratePreviewsView(APIView):
 
     def post(self, request):
         """
-        Genera vistas previas de las etapas del PDF.
+        Genera vistas previas de las etapas del PDF solo si no existen previamente
         """
         user = request.user
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         stages = serializer.validated_data["stages"]
 
-        if sum(stage["page_count"] for stage in stages) > user.page_limit:
-            return Response(
-                {"error": "The total number of pages exceeds your limit."}, status=400
-            )
-
         try:
-            preview_image_paths = []
+            os.makedirs(settings.TEMP_PDF_ROOT, exist_ok=True)
+            os.makedirs(settings.PREVIEW_IMAGES_ROOT, exist_ok=True)
 
-            # Para cada etapa, generar un archivo PDF temporal y convertirlo a imagen (primera página)
-            for stage_index, stage in enumerate(stages):
-                html = HTML(string=stage["html"])
-                stage_pdf_path = os.path.join(
-                    settings.TEMP_PDF_ROOT,
-                    f"{user.username}_stage_{stage_index + 1}_temp.pdf",
+            # Generar contenido combinado y hash único
+            combined_html = "\n".join(
+                [f'<div class="page">{stage["html"]}</div>' for stage in stages]
+            )
+            content_hash = hashlib.sha256(combined_html.encode("utf-8")).hexdigest()[
+                :10
+            ]
+            base_url = request.build_absolute_uri("/")[:-1]
+            preview_image_urls = []
+
+            # Verificar si todas las imágenes ya existen
+            all_images_exist = True
+            for page_number in range(1, len(stages) + 1):
+                filename = (
+                    f"{user.username}_{content_hash}_stage_{page_number}_preview.png"
                 )
-                html.write_pdf(stage_pdf_path)
+                filepath = os.path.join(settings.PREVIEW_IMAGES_ROOT, filename)
 
-                # Convertir el PDF a una imagen de la primera página
-                images = convert_from_path(stage_pdf_path, first_page=1, last_page=1)
+                if not os.path.exists(filepath):
+                    all_images_exist = False
+                    break
 
-                # Guardar la imagen generada en formato PNG (solo la primera página)
-                preview_image_path = os.path.join(
-                    settings.PREVIEW_IMAGES_ROOT,
-                    f"{user.username}_stage_{stage_index + 1}_preview.png",
+                preview_image_urls.append(
+                    f"{base_url}{settings.MEDIA_URL}preview_images/{filename}"
                 )
-                images[0].save(preview_image_path, "PNG")
-                preview_image_paths.append(preview_image_path)
 
-                # Eliminar el archivo PDF temporal después de convertirlo
-                os.remove(stage_pdf_path)
+            if all_images_exist:
+                return Response(
+                    {
+                        "message": "Preview images retrieved from cache.",
+                        "preview_images": preview_image_urls,
+                    }
+                )
+
+            # Generar nuevo contenido si no existe
+            css = """
+            <style>
+                @page { size: A4; margin: 1cm; }
+                .page { page-break-after: always; }
+                .page:last-child { page-break-after: auto; }
+            </style>
+            """
+            full_html = f"{css}{combined_html}"
+            html = HTML(string=full_html)
+
+            # Generar PDF temporal con hash
+            temp_pdf_path = os.path.join(
+                settings.TEMP_PDF_ROOT, f"{user.username}_{content_hash}_temp.pdf"
+            )
+            html.write_pdf(temp_pdf_path)
+
+            # Convertir a imágenes
+            images = convert_from_path(temp_pdf_path)
+            preview_image_urls = []
+
+            for page_number, image in enumerate(images, start=1):
+                filename = (
+                    f"{user.username}_{content_hash}_stage_{page_number}_preview.png"
+                )
+                filepath = os.path.join(settings.PREVIEW_IMAGES_ROOT, filename)
+
+                if not os.path.exists(filepath):
+                    image.save(filepath, "PNG")
+
+                preview_image_urls.append(
+                    f"{base_url}{settings.MEDIA_URL}preview_images/{filename}"
+                )
 
             return Response(
                 {
                     "message": "Preview images generated successfully.",
-                    "preview_images": preview_image_paths,
+                    "preview_images": preview_image_urls,
                 }
             )
 
         except Exception as e:
-            return Response(
-                {"error": f"Error generating previews: {str(e)}"}, status=500
-            )
+            # Asegurar limpieza del PDF temporal en caso de error
+            if "temp_pdf_path" in locals() and os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+            return Response({"error": str(e)}, status=500)
 
 
 class ConfirmAndGeneratePDFView(APIView):
@@ -88,7 +130,10 @@ class ConfirmAndGeneratePDFView(APIView):
                 status=400,
             )
 
-        temp_pdf_path = os.path.join(settings.TEMP_PDF_ROOT, f"{user.username}.pdf")
+        base_url = request.build_absolute_uri("/")[:-1]
+        file_name = f"{user.username}.pdf"
+
+        temp_pdf_path = os.path.join(settings.TEMP_PDF_ROOT, file_name)
 
         try:
             combined_html_content = ""
@@ -123,7 +168,10 @@ class ConfirmAndGeneratePDFView(APIView):
                 user.delete()
 
             return Response(
-                {"message": "PDF generated successfully.", "pdf_path": temp_pdf_path}
+                {
+                    "message": "PDF generated successfully.",
+                    "pdf_path": f"{base_url}{temp_pdf_path}{file_name}",
+                }
             )
 
         except Exception as e:

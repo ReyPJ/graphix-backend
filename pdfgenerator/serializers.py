@@ -12,20 +12,11 @@ class StageSerializer(serializers.Serializer):
 
 
 class GeneratePDFSerializer(serializers.Serializer):
-    global_html = serializers.CharField(
-        help_text="Global HTML that can combine all stages. Can be used for validation or final PDF structure."
-    )  # HTML global opcional
-    css = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        help_text="Optional global CSS for styling all stages.",
-    )  # CSS opcional
-
     stages = serializers.ListField(
         child=StageSerializer(),
         required=True,
-        min_length=6,
-        max_length=6,
+        min_length=1,
+        max_length=15,
         help_text="List of 15 or less stages. Each stage must have its own HTML and page count.",
     )  # Etapas individuales
     confirm = serializers.BooleanField(
