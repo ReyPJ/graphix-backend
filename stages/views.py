@@ -69,23 +69,22 @@ class FileUploadView(GenericAPIView):
     serializer_class = FileSerializer
 
     def post(self, request, *args, **kwargs):
-        print(request.data)
         serializer = self.get_serializer(data=request.data)
-
-        directory_path = settings.RESOURCES_MEDIA_ROOT
 
         if serializer.is_valid():
             files_urls = []
             for file in serializer.validated_data["files"]:
-                file_path = os.path.join(directory_path, file.name)
-                with default_storage.open(file_path, "wb+") as destination:
-                    for chunk in file.chunks():
-                        destination.write(chunk)
-                files_urls.append(
-                    request.build_absolute_uri(
-                        os.path.join(settings.MEDIA_URL, "resources_image/", file.name)
-                    )
-                )
+                # Sanitizar nombre de archivo
+                clean_name = os.path.basename(file.name)
+
+                # Ruta en el object storage (sin usar sistema de archivos local)
+                file_key = f"resources_image/{clean_name}"
+
+                # Guardar directamente en el object storage
+                default_storage.save(file_key, file)
+
+                # Obtener URL pública desde el storage
+                files_urls.append(default_storage.url(file_key))
 
             return Response({"files_url": files_urls}, status=201)
 

@@ -1,13 +1,14 @@
 from rest_framework.views import APIView
+from django.core.files.storage import default_storage
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import GeneratePDFSerializer
 from .models import GeneratedPDFModel
 from weasyprint import HTML
-from django.conf import settings
-import os
 import hashlib
 from pdf2image import convert_from_path
+import tempfile
+import os
 
 
 class GeneratePreviewsView(APIView):
@@ -16,7 +17,7 @@ class GeneratePreviewsView(APIView):
 
     def post(self, request):
         """
-        Genera vistas previas de las etapas del PDF solo si no existen previamente
+        Genera vistas previas de las etapas del PDF usando almacenamiento en la nube
         """
         user = request.user
         serializer = self.serializer_class(data=request.data)
@@ -24,9 +25,6 @@ class GeneratePreviewsView(APIView):
         stages = serializer.validated_data["stages"]
 
         try:
-            os.makedirs(settings.TEMP_PDF_ROOT, exist_ok=True)
-            os.makedirs(settings.PREVIEW_IMAGES_ROOT, exist_ok=True)
-
             # Generar contenido combinado y hash único
             combined_html = "\n".join(
                 [f'<div class="page">{stage["html"]}</div>' for stage in stages]
@@ -34,24 +32,21 @@ class GeneratePreviewsView(APIView):
             content_hash = hashlib.sha256(combined_html.encode("utf-8")).hexdigest()[
                 :10
             ]
-            base_url = request.build_absolute_uri("/")[:-1]
             preview_image_urls = []
 
-            # Verificar si todas las imágenes ya existen
+            # Verificar si existen las imágenes en el almacenamiento
             all_images_exist = True
             for page_number in range(1, len(stages) + 1):
                 filename = (
                     f"{user.username}_{content_hash}_stage_{page_number}_preview.png"
                 )
-                filepath = os.path.join(settings.PREVIEW_IMAGES_ROOT, filename)
+                filepath = f"preview_images/{filename}"
 
-                if not os.path.exists(filepath):
+                if not default_storage.exists(filepath):
                     all_images_exist = False
                     break
 
-                preview_image_urls.append(
-                    f"{base_url}{settings.MEDIA_URL}preview_images/{filename}"
-                )
+                preview_image_urls.append(default_storage.url(filepath))
 
             if all_images_exist:
                 return Response(
@@ -61,7 +56,7 @@ class GeneratePreviewsView(APIView):
                     }
                 )
 
-            # Generar nuevo contenido si no existe
+            # Generar nuevo PDF temporal
             css = """
             <style>
                 @page { size: A4; margin: 1cm; }
@@ -72,28 +67,30 @@ class GeneratePreviewsView(APIView):
             full_html = f"{css}{combined_html}"
             html = HTML(string=full_html)
 
-            # Generar PDF temporal con hash
-            temp_pdf_path = os.path.join(
-                settings.TEMP_PDF_ROOT, f"{user.username}_{content_hash}_temp.pdf"
-            )
-            html.write_pdf(temp_pdf_path)
+            # Crear archivo temporal para la conversión
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+                pdf_content = html.write_pdf()
+                tmp_pdf.write(pdf_content)
+                tmp_pdf_path = tmp_pdf.name
 
-            # Convertir a imágenes
-            images = convert_from_path(temp_pdf_path)
+            # Convertir a imágenes desde el archivo temporal
+            images = convert_from_path(tmp_pdf_path)
+            os.unlink(tmp_pdf_path)  # Eliminar archivo temporal
+
+            # Guardar imágenes en el almacenamiento en la nube
             preview_image_urls = []
-
             for page_number, image in enumerate(images, start=1):
                 filename = (
                     f"{user.username}_{content_hash}_stage_{page_number}_preview.png"
                 )
-                filepath = os.path.join(settings.PREVIEW_IMAGES_ROOT, filename)
+                filepath = f"preview_images/{filename}"
 
-                if not os.path.exists(filepath):
-                    image.save(filepath, "PNG")
+                # Guardar imagen directamente en el almacenamiento
+                with tempfile.NamedTemporaryFile(suffix=".png") as tmp_img:
+                    image.save(tmp_img.name, "PNG")
+                    default_storage.save(filepath, tmp_img)
 
-                preview_image_urls.append(
-                    f"{base_url}{settings.MEDIA_URL}preview_images/{filename}"
-                )
+                preview_image_urls.append(default_storage.url(filepath))
 
             return Response(
                 {
@@ -103,9 +100,6 @@ class GeneratePreviewsView(APIView):
             )
 
         except Exception as e:
-            # Asegurar limpieza del PDF temporal en caso de error
-            if "temp_pdf_path" in locals() and os.path.exists(temp_pdf_path):
-                os.remove(temp_pdf_path)
             return Response({"error": str(e)}, status=500)
 
 
@@ -115,7 +109,7 @@ class ConfirmAndGeneratePDFView(APIView):
 
     def post(self, request):
         """
-        Genera el PDF final después de confirmar las vistas previas.
+        Genera el PDF final y lo guarda en el object storage
         """
         user = request.user
         serializer = self.serializer_class(data=request.data)
@@ -126,53 +120,48 @@ class ConfirmAndGeneratePDFView(APIView):
 
         if not confirm:
             return Response(
-                {"error": "You must confirm the preview before generating the PDF."},
+                {"error": "Debes confirmar la vista previa antes de generar el PDF."},
                 status=400,
             )
 
-        base_url = request.build_absolute_uri("/")[:-1]
-        file_name = f"{user.username}.pdf"
-
-        temp_pdf_path = os.path.join(settings.TEMP_PDF_ROOT, file_name)
-
         try:
             combined_html_content = ""
-
             for stage in stages:
-                # Dividir la etapa en tantas partes como lo indique page_count
                 page_count = stage["page_count"]
                 stage_html = stage["html"]
 
-                # Si el page_count es mayor a 1, duplicamos el contenido de la etapa
-                # Para cada página en la etapa, añadimos el mismo contenido HTML.
-                for i in range(page_count):
-                    stage_page_html = f"""
+                for _ in range(page_count):
+                    combined_html_content += f"""
                     <div>{stage_html}</div>
                     <div style="page-break-before: always;"></div>
                     """
-                    combined_html_content += stage_page_html
 
-            # Generamos el PDF a partir del contenido combinado
+            # Generar PDF
             html = HTML(string=combined_html_content)
             pdf_content = html.write_pdf()
 
-            # Guardar el PDF generado en un archivo
-            with open(temp_pdf_path, "wb") as pdf_file:
-                pdf_file.write(pdf_content)
+            # Guardar directamente en el object storage
+            filename = f"{user.username}_final.pdf"
+            filepath = f"final_pdfs/{filename}"
 
-            # Guardar el modelo y progreso del usuario
-            GeneratedPDFModel.objects.create(user=user, pdf_file=temp_pdf_path)
+            with tempfile.NamedTemporaryFile() as tmp_file:
+                tmp_file.write(pdf_content)
+                tmp_file.flush()
+                default_storage.save(filepath, tmp_file)
 
-            # Eliminar el usuario temporal si aplica
-            if user.is_temporary:
+            # Registrar en la base de datos
+            GeneratedPDFModel.objects.create(user=user, pdf_file=filepath)
+
+            # Eliminar usuario temporal si aplica
+            if hasattr(user, "is_temporary") and user.is_temporary:
                 user.delete()
 
             return Response(
                 {
-                    "message": "PDF generated successfully.",
-                    "pdf_path": f"{base_url}{temp_pdf_path}{file_name}",
+                    "message": "PDF generado exitosamente.",
+                    "pdf_url": default_storage.url(filepath),
                 }
             )
 
         except Exception as e:
-            return Response({"error": f"Error generating PDF: {str(e)}"}, status=500)
+            return Response({"error": f"Error generando PDF: {str(e)}"}, status=500)

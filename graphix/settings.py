@@ -15,11 +15,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO-SECRET-KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY no está configurado en las variables de entorno")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO-DEBUG")
+DEBUG = os.getenv("DJANGO-DEBUG", "False").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["apilogisctica.com", "www.apilogisctica.com"]
 
 
 # Application definition
@@ -36,7 +38,8 @@ INSTALLED_APPS = [
     "stages",
     "rest_framework",
     "corsheaders",
-    "drf_spectacular"
+    "drf_spectacular",
+    "storages",
 ]
 
 if DEBUG:
@@ -60,6 +63,9 @@ else:
     SECURE_BROWSER_XSS_FILTER = True
     USE_X_FORWARDED_HOST = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 MIDDLEWARE = [
@@ -73,10 +79,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://192.168.100.224:3000"
-]
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "http://192.168.100.224:3000"]
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -111,20 +114,20 @@ TEMPLATES = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ]
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+    ],
 }
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Grahpix API",
     "DESCRIPTION": "API For Grahpix Client PDF generate system",
     "VERSION": "0.0.2",
-    "SERVE_INCLUDE_SCHEMA": False
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 WSGI_APPLICATION = "graphix.wsgi.application"
@@ -132,12 +135,24 @@ WSGI_APPLICATION = "graphix.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+if DEBUG:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        }
+    }
 
 
 # Password validation
@@ -176,16 +191,49 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = "static/"
-MEDIA_ROOT = BASE_DIR / "media"
-MEDIA_URL = "/media/"
+# Configuración de DigitalOcean Spaces
+AWS_ACCESS_KEY_ID = os.getenv("SPACES_ACCESS_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("SPACES_SECRET_KEY")
+AWS_S3_REGION_NAME = os.getenv("SPACES_REGION")
+AWS_STORAGE_BUCKET_NAME = os.getenv("SPACES_BUCKET_NAME")
+AWS_S3_ENDPOINT_URL = f"https://{os.getenv('SPACES_REGION')}.digitaloceanspaces.com"
+AWS_S3_CUSTOM_DOMAIN = (
+    f"{AWS_STORAGE_BUCKET_NAME}.{os.getenv('SPACES_REGION')}.cdn.digitaloceanspaces.com"
+)
+AWS_DEFAULT_ACL = 'public-read'
 
-TEMP_PDF_ROOT = os.path.join(MEDIA_ROOT, "temp_pdfs/")
-os.makedirs(TEMP_PDF_ROOT, exist_ok=True)
-PREVIEW_IMAGES_ROOT = os.path.join(MEDIA_ROOT, "preview_images/")
-os.makedirs(PREVIEW_IMAGES_ROOT, exist_ok=True)
-RESOURCES_MEDIA_ROOT = os.path.join(MEDIA_ROOT, "resources_image/")
-os.makedirs(RESOURCES_MEDIA_ROOT, exist_ok=True)
+
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",  # Cachea archivos por 24 horas
+}
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        'OPTIONS': {
+            'access_key': AWS_ACCESS_KEY_ID,
+            'secret_key': AWS_SECRET_ACCESS_KEY,
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'region_name': AWS_S3_REGION_NAME,
+            'endpoint_url': AWS_S3_ENDPOINT_URL,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+        },
+    },
+    'staticfiles': {
+        'BACKEND': 'storages.backends.s3boto3.S3StaticStorage',
+        'OPTIONS': {
+            'access_key': AWS_ACCESS_KEY_ID,
+            'secret_key': AWS_SECRET_ACCESS_KEY,
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'region_name': AWS_S3_REGION_NAME,
+            'endpoint_url': AWS_S3_ENDPOINT_URL,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+        },
+    },
+}
+
+STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -194,6 +242,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # JWT SETTINGS
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=3)
-}
+SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(hours=3)}
