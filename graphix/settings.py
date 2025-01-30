@@ -21,7 +21,7 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO-DEBUG", "False").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = ["apilogisctica.com", "www.apilogisctica.com", "165.227.123.200"]
+ALLOWED_HOSTS = ["apilogisctica.com", "www.apilogisctica.com", "165.227.123.200", "0.0.0.0"]
 
 
 # Application definition
