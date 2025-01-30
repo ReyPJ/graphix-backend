@@ -14,4 +14,4 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
-CMD ["sh", "-c", "python manage.py migrate && gunicorn graphix.wsgi:application --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn --access-logfile graphix.wsgi:application --bind 0.0.0.0:8000"]

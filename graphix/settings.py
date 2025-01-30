@@ -54,7 +54,6 @@ if DEBUG:
     SECURE_PROXY_SSL_HEADER = None
 
 else:
-    ALLOWED_HOSTS = ["*"]
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -79,7 +78,11 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "http://192.168.100.224:3000"]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://192.168.100.224:3000",
+    "https://graphix-lilac.vercel.app",
+]
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -93,6 +96,23 @@ CORS_ALLOW_HEADERS = [
     "cache-control",
     "pragma",
 ]
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
+}
 
 
 ROOT_URLCONF = "graphix.urls"
@@ -200,7 +220,7 @@ AWS_S3_ENDPOINT_URL = f"https://{os.getenv('SPACES_REGION')}.digitaloceanspaces.
 AWS_S3_CUSTOM_DOMAIN = (
     f"{AWS_STORAGE_BUCKET_NAME}.{os.getenv('SPACES_REGION')}.cdn.digitaloceanspaces.com"
 )
-AWS_DEFAULT_ACL = 'public-read'
+AWS_DEFAULT_ACL = "public-read"
 
 
 AWS_S3_OBJECT_PARAMETERS = {
@@ -208,26 +228,26 @@ AWS_S3_OBJECT_PARAMETERS = {
 }
 
 STORAGES = {
-    'default': {
-        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
-        'OPTIONS': {
-            'access_key': AWS_ACCESS_KEY_ID,
-            'secret_key': AWS_SECRET_ACCESS_KEY,
-            'bucket_name': AWS_STORAGE_BUCKET_NAME,
-            'region_name': AWS_S3_REGION_NAME,
-            'endpoint_url': AWS_S3_ENDPOINT_URL,
-            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "region_name": AWS_S3_REGION_NAME,
+            "endpoint_url": AWS_S3_ENDPOINT_URL,
+            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
         },
     },
-    'staticfiles': {
-        'BACKEND': 'storages.backends.s3boto3.S3StaticStorage',
-        'OPTIONS': {
-            'access_key': AWS_ACCESS_KEY_ID,
-            'secret_key': AWS_SECRET_ACCESS_KEY,
-            'bucket_name': AWS_STORAGE_BUCKET_NAME,
-            'region_name': AWS_S3_REGION_NAME,
-            'endpoint_url': AWS_S3_ENDPOINT_URL,
-            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+    "staticfiles": {
+        "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+        "OPTIONS": {
+            "access_key": AWS_ACCESS_KEY_ID,
+            "secret_key": AWS_SECRET_ACCESS_KEY,
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "region_name": AWS_S3_REGION_NAME,
+            "endpoint_url": AWS_S3_ENDPOINT_URL,
+            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
         },
     },
 }
